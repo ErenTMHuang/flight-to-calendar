@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>机票 → Google 日历</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="container">
+    <h1>✈️ 机票 → Google 日历</h1>
+    <p class="subtitle">读取 Gmail 里的机票邮件，整理成行程，一键写入 Google 日历。</p>
+
+    <!-- 配置区 -->
+    <details class="card" id="config-card" open>
+      <summary><strong>① 配置</strong>（首次使用必填，之后会记住）</summary>
+      <div class="card-body">
+        <label>
+          Google OAuth 客户端 ID
+          <input id="client-id" type="text" placeholder="xxxxxxxx.apps.googleusercontent.com" />
+          <small>在 Google Cloud Console 创建，见 README。</small>
+        </label>
+
+        <label>
+          Gemini API Key <span class="optional">（可选，强烈推荐：解析准确度高很多）</span>
+          <input id="gemini-key" type="password" placeholder="AIza..." />
+          <small>留空则用内置的简单规则解析（不准）。在 aistudio.google.com 免费获取。</small>
+        </label>
+
+        <label>
+          Gmail 搜索条件
+          <input id="gmail-query" type="text"
+            value="(航班 OR 机票 OR 行程单 OR flight OR itinerary OR e-ticket OR boarding) newer_than:180d" />
+          <small>Gmail 搜索语法，决定扫描哪些邮件。</small>
+        </label>
+
+        <label>
+          最多扫描邮件数
+          <input id="max-results" type="number" value="20" min="1" max="100" />
+        </label>
+
+        <button id="save-config" class="btn-secondary">保存配置</button>
+      </div>
+    </details>
+
+    <!-- 操作区 -->
+    <section class="card">
+      <div class="card-body actions">
+        <button id="connect-btn" class="btn-primary">② 连接 Google 账号</button>
+        <button id="scan-btn" class="btn-primary" disabled>③ 扫描机票邮件</button>
+        <span id="auth-status" class="status-pill">未连接</span>
+      </div>
+    </section>
+
+    <!-- 结果区 -->
+    <section id="results-section" class="card hidden">
+      <div class="card-body">
+        <div class="results-header">
+          <strong>④ 解析结果</strong>（请核对/修改后再添加）
+          <button id="add-all-btn" class="btn-primary">全部添加到日历</button>
+        </div>
+        <div id="results"></div>
+      </div>
+    </section>
+
+    <!-- 日志区 -->
+    <section class="card">
+      <div class="card-body">
+        <strong>日志</strong>
+        <pre id="log"></pre>
+      </div>
+    </section>
+  </main>
+
+  <!-- Google Identity Services -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="parser.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

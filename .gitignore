@@ -1,0 +1,5 @@
+# 本项目是纯前端静态站点，无需提交依赖或构建产物
+node_modules/
+.DS_Store
+Thumbs.db
+*.log
