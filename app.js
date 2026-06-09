@@ -131,16 +131,20 @@ async function scan() {
     log(`其中 ${candidates.length} 封像机票/行程，开始解析…`);
 
     if (geminiKey) {
-      // 2a) AI 解析：所有邮件分批合并成请求（每批最多 12 封），避免逐封触发限流
-      const CHUNK = 12;
-      for (let i = 0; i < candidates.length; i += CHUNK) {
+      // 2a) AI 解析：所有邮件分批合并成请求（每批最多 10 封），批次间隔以遵守每分钟限速
+      const CHUNK = 10;
+      const totalBatches = Math.ceil(candidates.length / CHUNK);
+      for (let i = 0, b = 0; i < candidates.length; i += CHUNK, b++) {
+        if (b > 0) await sleep(5000); // 批次间隔 5s，避免每分钟限速
         const batch = candidates.slice(i, i + CHUNK);
         try {
+          log(`🤖 解析第 ${b + 1}/${totalBatches} 批（${batch.length} 封）…`);
           const flights = await parseWithGeminiBatch(batch, geminiKey);
           log(`📨 第 ${i + 1}~${i + batch.length} 封 → ${flights.length} 个航班`);
           allFlights.push(...flights);
         } catch (e) {
           log(`⚠️ 批量解析出错：${e.message}`);
+          break; // 限流/配额错误时停止后续批次，避免雪上加霜
         }
       }
     } else {

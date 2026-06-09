@@ -83,7 +83,15 @@ async function callGemini(promptText, apiKey, attempt = 0) {
   }
 
   if (!resp.ok) {
-    throw new Error("Gemini 请求失败: " + resp.status + " " + (await resp.text()));
+    const errText = await resp.text();
+    if (resp.status === 429) {
+      const perDay = /per\s?day|PerDay|GenerateRequestsPerDay/i.test(errText);
+      const hint = perDay
+        ? "Gemini 今日免费额度可能已用尽（每日配额，需等到次日太平洋时间重置）。"
+        : "Gemini 触发每分钟限速。请把『最多扫描邮件数』调到 5 以内、稍等 1 分钟再试。";
+      throw new Error(hint);
+    }
+    throw new Error("Gemini 请求失败: " + resp.status + " " + errText);
   }
 
   const data = await resp.json();
@@ -118,12 +126,14 @@ function sleep(ms) {
  */
 function looksLikeFlight(text) {
   if (!text) return false;
-  const hasFlightNo = /\b[A-Z0-9]{2}\s?\d{2,4}\b/.test(text);
-  const hasKeyword =
-    /(航班|机票|行程单|登机|值机|起飞|出发时间|航空|flight|itinerary|e-?ticket|boarding|departure|airlines?|PNR|订座)/i.test(
+  // 真航班号：前缀必须含字母(航司代码)，排除 "2024"、订单号 等纯数字误判
+  const hasFlightNo = /\b([A-Z]{2}|[A-Z]\d|\d[A-Z])\s?\d{2,4}\b/.test(text);
+  // 真实出票/行程的强信号（广告促销邮件通常没有这些）
+  const hasStrong =
+    /(行程单|电子客票|电子机票|登机牌|登机口|值机|订座号|确认号|出票|航班号|乘机人|boarding\s?pass|e-?ticket|itinerary|booking\s?reference|confirmation\s?number|\bPNR\b)/i.test(
       text
     );
-  return hasFlightNo || hasKeyword;
+  return hasFlightNo || hasStrong;
 }
 
 /* ---------- 兜底：纯正则启发式解析 ---------- */
