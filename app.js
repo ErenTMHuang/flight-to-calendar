@@ -117,25 +117,40 @@ async function scan() {
     const geminiKey = els.geminiKey.value.trim();
     let allFlights = [];
 
+    // 1) 抓正文 + 预筛掉明显不是机票的邮件
+    const candidates = [];
     for (let i = 0; i < messages.length; i++) {
       const full = await gmailFetch(`/messages/${messages[i].id}?format=full`);
       const subject = headerOf(full, "Subject");
       const text = extractText(full.payload);
+      const combined = subject + "\n" + text;
       if (!text.trim()) continue;
+      if (!looksLikeFlight(combined)) continue;
+      candidates.push({ subject, text: combined });
+    }
+    log(`其中 ${candidates.length} 封像机票/行程，开始解析…`);
 
-      let flights = [];
-      try {
-        flights = geminiKey
-          ? await parseWithGemini(subject + "\n" + text, geminiKey)
-          : parseHeuristic(subject + "\n" + text);
-      } catch (e) {
-        log(`⚠️ 第 ${i + 1} 封解析出错：${e.message}`);
-        continue;
+    if (geminiKey) {
+      // 2a) AI 解析：所有邮件分批合并成请求（每批最多 12 封），避免逐封触发限流
+      const CHUNK = 12;
+      for (let i = 0; i < candidates.length; i += CHUNK) {
+        const batch = candidates.slice(i, i + CHUNK);
+        try {
+          const flights = await parseWithGeminiBatch(batch, geminiKey);
+          log(`📨 第 ${i + 1}~${i + batch.length} 封 → ${flights.length} 个航班`);
+          allFlights.push(...flights);
+        } catch (e) {
+          log(`⚠️ 批量解析出错：${e.message}`);
+        }
       }
-
-      if (flights.length) {
-        log(`📨 「${subject}」→ ${flights.length} 个航班`);
-        allFlights.push(...flights);
+    } else {
+      // 2b) 无 key：逐封走正则兜底
+      for (const c of candidates) {
+        const flights = parseHeuristic(c.text);
+        if (flights.length) {
+          log(`📨 「${c.subject}」→ ${flights.length} 个航班`);
+          allFlights.push(...flights);
+        }
       }
     }
 
@@ -321,4 +336,5 @@ els.saveConfig.addEventListener("click", saveConfig);
 els.connectBtn.addEventListener("click", connect);
 els.scanBtn.addEventListener("click", scan);
 els.addAllBtn.addEventListener("click", addAll);
+window.__log = log; // 供 parser.js 输出 429 重试提示
 loadConfig();
